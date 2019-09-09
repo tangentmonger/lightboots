@@ -21,6 +21,12 @@ double temperature = 100;
 double ambient = 0;
 double k = 0.5; // rate of cooling 
 
+#define RED_THRESHOLD 25
+#define ORANGE_THRESHOLD 50
+#define YELLOW_THRESHOLD 75
+#define WHITE_THRESHOLD 100
+#define HOTNESS_RATIO 0.4
+
 
 void setup(void)
 {
@@ -49,30 +55,71 @@ void loop(void)
   temperature = ambient + (temperature * exp( -1 * k * BNO055_SAMPLERATE_DELAY_MS / 1000));
 
   // do some heating
-  temperature += total_data;
+  temperature = min(total_data+temperature, 100);
 
   Serial.print(temperature);
   Serial.print(" ");
-  Serial.print(linearAccelData.acceleration.x);
-  Serial.print(" ");
-  Serial.print(linearAccelData.acceleration.y);
-  Serial.print(" ");
-  Serial.print(linearAccelData.acceleration.z);
-  Serial.println();
+  double hottest_point = temperature * HOTNESS_RATIO;
+  //Serial.print(hottest_point);
+
+  double flame_height = double(temperature);
+
 
   for(int i=0; i<NUM_LEDS; i++){
-    if(i<=abs(int(temperature/10))){
+    double flame_part = double(i) / double(NUM_LEDS) * 100.0;
 
+    if (flame_part < hottest_point)
+    {
+        double led_temperature = flame_part / hottest_point * temperature;
+        Serial.print(" ");
+        Serial.print(led_temperature);
 
-        leds[i].setRGB(temperature,0,0);
-    } 
+        leds[i].setRGB(led_temperature,0,0);
+
+    }
     else
     {
-        leds[i].setRGB(0,0,0);
+        double led_temperature = max(temperature - ((flame_part - hottest_point) / (flame_height - hottest_point) * temperature), 0);
+        Serial.print(" ");
+        Serial.print(led_temperature);
+        leds[i].setRGB(led_temperature,0,0);
+
+
     }
+
   }
+  Serial.println();
+
   FastLED.show();
 
   delay(BNO055_SAMPLERATE_DELAY_MS);
 }
 
+
+
+double red_percentage(double temperature)
+{
+    if (temperature > RED_THRESHOLD) return 100;
+    return temperature / RED_THRESHOLD * 100;
+}
+
+double orange_percentage(double temperature)
+{
+    if (temperature < RED_THRESHOLD) return 0;
+    if (temperature > ORANGE_THRESHOLD) return 100;
+    return (temperature - RED_THRESHOLD) / (ORANGE_THRESHOLD - RED_THRESHOLD) * 100;
+}
+
+double yellow_percentage(double temperature)
+{
+    if (temperature < ORANGE_THRESHOLD) return 0;
+    if (temperature > YELLOW_THRESHOLD) return 100;
+    return (temperature - ORANGE_THRESHOLD) / (YELLOW_THRESHOLD - ORANGE_THRESHOLD) * 100;
+}
+
+double white_percentage(double temperature)
+{
+    if (temperature < YELLOW_THRESHOLD) return 0;
+    if (temperature > WHITE_THRESHOLD) return 100;
+    return (temperature - YELLOW_THRESHOLD) / (WHITE_THRESHOLD - YELLOW_THRESHOLD) * 100;
+}
